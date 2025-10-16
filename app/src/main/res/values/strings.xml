@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">RickAndMortyApp</string>
+    <string name="search" />
+    <string name="searchCharacters">Search characters</string>
 </resources>
