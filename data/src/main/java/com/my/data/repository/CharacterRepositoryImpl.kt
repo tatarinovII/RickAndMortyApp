@@ -40,7 +40,6 @@ class CharacterRepositoryImpl(context: Context) : CharacterRepository {
                             db.getDao().insertCharacter(
                                 mapper.mapCharacterResponseToLocalCharacter(it, page)
                             )
-                            Log.d("!!!", "Saving character ${it.name} to cache.")
                         }
                         return characterResponse.results.map {
                             mapper.mapCharacterResponseToCharacter(it)

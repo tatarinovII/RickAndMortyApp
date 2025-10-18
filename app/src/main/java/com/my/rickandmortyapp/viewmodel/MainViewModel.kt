@@ -28,10 +28,9 @@ class MainViewModel(
         viewModelScope.launch {
             isLoading = true
             try {
-                val list = getNextPageUseCase.execute(currentPage, emptyMap())
-
+                val newItems = getNextPageUseCase.execute(currentPage, emptyMap())
                 val currentList = _characterList.value ?: emptyList()
-                _characterList.value = currentList + list
+                _characterList.value = currentList + newItems
                 currentPage++
             } catch (e: Exception) {
                 Log.e("!!!", e.toString())

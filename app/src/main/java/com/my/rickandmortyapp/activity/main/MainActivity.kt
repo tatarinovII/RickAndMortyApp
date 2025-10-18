@@ -21,7 +21,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter = CharacterAdapter(mutableListOf(), onItemClick = {})
+        adapter = CharacterAdapter(onItemClick = {}, onLoadMore = {
+            vm.loadPage()
+        })
         binding.rv.layoutManager = GridLayoutManager(this, 2)
         binding.rv.adapter = adapter
 
@@ -30,7 +32,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpObservers() {
         vm.characterList.observe(this) { list ->
-            adapter.addItems(list)
+            adapter.updateItems(list)
         }
     }
 }
