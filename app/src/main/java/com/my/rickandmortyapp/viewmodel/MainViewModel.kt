@@ -20,17 +20,24 @@ class MainViewModel(
     private var isLoading: Boolean = false
 
     init {
-        loadPage()
+        loadPage(emptyMap())
     }
 
-    fun loadPage() {
+    fun loadPage(filters: Map<String, String>, isClear: Boolean = false) {
         if (isLoading) return
         viewModelScope.launch {
             isLoading = true
             try {
-                val newItems = getNextPageUseCase.execute(currentPage, emptyMap())
                 val currentList = _characterList.value ?: emptyList()
-                _characterList.value = currentList + newItems
+                if (isClear) {
+                    currentPage = 1
+                    val newItems = getNextPageUseCase.execute(currentPage, filters)
+                    _characterList.value = newItems
+                }
+                else {
+                    val newItems = getNextPageUseCase.execute(currentPage, filters)
+                    _characterList.value = currentList + newItems
+                }
                 currentPage++
             } catch (e: Exception) {
                 Log.e("!!!", e.toString())

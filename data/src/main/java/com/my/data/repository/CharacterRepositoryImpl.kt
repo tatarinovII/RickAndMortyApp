@@ -29,22 +29,30 @@ class CharacterRepositoryImpl(context: Context) : CharacterRepository {
             } else {
                 Log.i("!!!", "Page $page not in cache. Getting from network.")
                 val response = apiService.getFilteredCharacters(
-                    page, filters["status"], filters["species"], filters["type"], filters["gender"]
+                    page = page,
+                    name = filters["name"],
+                    status = filters["status"],
+                    species = filters["species"],
+                    type = filters["type"],
+                    gender = filters["gender"]
                 )
 
                 if (response.isSuccessful) {
                     val characterResponse = response.body()
                     if (characterResponse != null) {
-                        Log.i("!!!", "Saving page $page to cache.")
-                        characterResponse.results.forEach {
-                            db.getDao().insertCharacter(
-                                mapper.mapCharacterResponseToLocalCharacter(it, page)
-                            )
+                        if (filters.isEmpty()) {
+                            Log.i("!!!", "Saving page $page to cache.")
+                            characterResponse.results.forEach {
+                                db.getDao().insertCharacter(
+                                    mapper.mapCharacterResponseToLocalCharacter(it, page)
+                                )
+                            }
                         }
                         return characterResponse.results.map {
                             mapper.mapCharacterResponseToCharacter(it)
                         }
                     }
+
                 } else {
                     Log.e("!!!", "Network request failed with code: ${response.code()}")
                 }
