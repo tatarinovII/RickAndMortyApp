@@ -16,25 +16,28 @@ class MainViewModel(
     private val _characterList = MutableLiveData<List<Character>>(emptyList())
     val characterList: LiveData<List<Character>> = _characterList
 
+    private val _isLoading = MutableLiveData<Boolean>(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private var currentPage: Int = 1
-    private var isLoading: Boolean = false
 
     init {
-        loadPage(emptyMap())
+        loadPage(emptyMap(), true)
     }
 
     fun loadPage(filters: Map<String, String>, isClear: Boolean = false) {
-        if (isLoading) return
+        if (_isLoading.value == true || (!isClear && filters.isNotEmpty())) {
+            return
+        }
         viewModelScope.launch {
-            isLoading = true
+            _isLoading.value = true
             try {
                 val currentList = _characterList.value ?: emptyList()
                 if (isClear) {
                     currentPage = 1
                     val newItems = getNextPageUseCase.execute(currentPage, filters)
                     _characterList.value = newItems
-                }
-                else {
+                } else {
                     val newItems = getNextPageUseCase.execute(currentPage, filters)
                     _characterList.value = currentList + newItems
                 }
@@ -42,7 +45,7 @@ class MainViewModel(
             } catch (e: Exception) {
                 Log.e("!!!", e.toString())
             } finally {
-                isLoading = false
+                _isLoading.value = false
             }
         }
     }

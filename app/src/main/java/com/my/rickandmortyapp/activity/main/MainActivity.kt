@@ -30,24 +30,55 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setUpObservers()
-        setUpClickListeners()
         currentFilters = mutableMapOf()
 
+        setUpRecyclerView()
+        setUpObservers()
+        setUpClickListeners()
+
+    }
+
+    private fun setUpRecyclerView() {
         adapter = CharacterAdapter(onItemClick = { character ->
             showCharacterDescription(character)
         }, onLoadMore = {
             vm.loadPage(currentFilters)
         })
-
-
         binding.rv.layoutManager = GridLayoutManager(this, 2)
         binding.rv.adapter = adapter
     }
 
     private fun setUpObservers() {
         vm.characterList.observe(this) { list ->
+            binding.progressBar.isVisible = false
+            binding.swipeRefreshLayout.isRefreshing = false
+
+            val isListEmpty = list.isEmpty()
+
+            binding.rv.isVisible = !isListEmpty
+
+            if (isListEmpty && (currentFilters.isNotEmpty() || adapter.itemCount > 0)) {
+                binding.tvEmptySearch.isVisible = true
+            } else {
+                binding.tvEmptySearch.isVisible = false
+            }
+
             adapter.updateItems(list)
+        }
+
+        vm.isLoading.observe(this) { isLoading ->
+            if (isLoading) {
+                if (adapter.itemCount == 0) {
+                    binding.progressBar.isVisible = true
+                }
+                binding.tvEmptySearch.isVisible = false
+            } else {
+                binding.progressBar.isVisible = false
+                if (binding.swipeRefreshLayout.isRefreshing) {
+                    binding.swipeRefreshLayout.isRefreshing = false
+                }
+            }
+            adapter.setLoading(isLoading)
         }
     }
 
@@ -66,6 +97,13 @@ class MainActivity : AppCompatActivity() {
             vm.loadPage(currentFilters, true)
         }
 
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            currentFilters.remove("name")
+            binding.etSearch.text.clear()
+            vm.loadPage(currentFilters, true)
+        }
+
+
         val textWatcher = object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {}
 
@@ -81,8 +119,11 @@ class MainActivity : AppCompatActivity() {
             }
 
         }
-
         binding.etSearch.addTextChangedListener(textWatcher)
+
+        binding.bFilters.setOnClickListener {
+            showFiltersDialog()
+        }
     }
 
     private fun showCharacterDescription(character: Character) {
@@ -104,5 +145,17 @@ class MainActivity : AppCompatActivity() {
         btnClose.setOnClickListener {
             myDialog.dismiss()
         }
+    }
+
+    private fun showFiltersDialog() {
+        val dialog = FiltersDialogFragment()
+
+        dialog.onApplyFilters = { status, gender ->
+            currentFilters.clear()
+            if (status != null) currentFilters["status"] = status
+            if (gender != null) currentFilters["gender"] = gender
+            vm.loadPage(currentFilters, true)
+        }
+        dialog.show(supportFragmentManager, "FiltersDialogFragment")
     }
 }
