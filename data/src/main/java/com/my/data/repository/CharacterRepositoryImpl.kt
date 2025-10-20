@@ -5,68 +5,74 @@ import android.util.Log
 import com.my.data.database.MainDB
 import com.my.data.mappers.Mapper
 import com.my.data.retrofit.RetrofitObj
+import com.my.data.utils.NetworkChecker
 import com.my.domain.models.Character
 import com.my.domain.repository.CharacterRepository
-import java.io.IOException
 
 class CharacterRepositoryImpl(context: Context) : CharacterRepository {
 
     private val mapper = Mapper()
     private val apiService = RetrofitObj.retrofit
     private val db = MainDB.getDb(context)
-
+    private val networkChecker = NetworkChecker(context)
 
     override suspend fun getPage(
         page: Int, filters: Map<String, String>
     ): List<Character> {
         try {
-            if (isPageInCache(page, filters)) {
-                Log.i("!!!", "Page $page found in cache. Getting from DB.")
-                val characterList = db.getDao().getCharactersByPage(page)
-                return characterList.map {
-                    mapper.mapLocalCharacterToCharacter(it)
-                }
+            if (networkChecker.isNetworkAvailable()) {
+                Log.i("!!!", "Network available. Getting from API")
+                return getFromApi(page, filters)
             } else {
-                Log.i("!!!", "Page $page not in cache. Getting from network.")
-                val response = apiService.getFilteredCharacters(
-                    page, filters["status"], filters["species"], filters["type"], filters["gender"]
-                )
+                Log.i("!!!", "Network not available. Getting from DB")
+                return getFromDb(filters)
+            }
+        } catch (e: Exception) {
+            Log.e("!!!", "Error while getting page $page: ${e.message}")
+            return emptyList()
+        }
+    }
 
-                if (response.isSuccessful) {
-                    val characterResponse = response.body()
-                    if (characterResponse != null) {
-                        Log.i("!!!", "Saving page $page to cache.")
-                        characterResponse.results.forEach {
-                            db.getDao().insertCharacter(
-                                mapper.mapCharacterResponseToLocalCharacter(it, page)
-                            )
-                            Log.d("!!!", "Saving character ${it.name} to cache.")
-                        }
-                        return characterResponse.results.map {
-                            mapper.mapCharacterResponseToCharacter(it)
-                        }
+    private suspend fun getFromApi(page: Int, filters: Map<String, String>): List<Character> {
+
+        if (filters.isEmpty() && db.getDao().getCharactersOnPageCount(page) > 0) {
+            Log.i("!!!", "Page $page in cache. Getting from db")
+            return db.getDao().getCharactersByPage(page).map {
+                mapper.mapLocalCharacterToCharacter(it)
+            }
+        }
+
+        Log.i("!!!", "Page $page not in cache or filters applied. Getting from network.")
+        val response = apiService.getFilteredCharacters(
+            page = page,
+            name = filters["name"],
+            status = filters["status"],
+            gender = filters["gender"]
+        )
+        if (response.isSuccessful) {
+            val characterResponse = response.body()
+            if (characterResponse != null) {
+                if (filters.isEmpty()) {
+                    Log.i("!!!", "Saving page $page to db")
+                    characterResponse.results.forEach {
+                        db.getDao()
+                            .insertCharacter(mapper.mapCharacterResponseToLocalCharacter(it, page))
                     }
-                } else {
-                    Log.e("!!!", "Network request failed with code: ${response.code()}")
+                }
+                return characterResponse.results.map {
+                    mapper.mapCharacterResponseToCharacter(it)
                 }
             }
-        } catch (e: IOException) {
-            Log.e("!!!", "Network error while getting page $page", e)
-        } catch (e: Exception) {
-            Log.e("!!!", "An unexpected error occurred in getPage", e)
+        } else {
+            Log.e("!!!", "Network request failed. Code: ${response.code()}")
         }
         return emptyList()
     }
 
-    private suspend fun isPageInCache(page: Int, filters: Map<String, String>): Boolean {
-        if (filters.isNotEmpty()) return false
-        try {
-            Log.i("!!!", "Checking page in cache")
-            if (db.getDao().getCharactersOnPageCount(page) == 20) return true else false
-        } catch (e: Exception) {
-            Log.e("!!!", "Error while checking page in cache", e)
-            throw e
-        }
-        return false
+    private suspend fun getFromDb(filters: Map<String, String>): List<Character> {
+        val characterList = db.getDao().getFilteredCharactersFromDb(
+            name = filters["name"], status = filters["status"], gender = filters["gender"]
+        )
+        return characterList.map { mapper.mapLocalCharacterToCharacter(it) }
     }
 }
